@@ -22,10 +22,18 @@ dashboard. It is built on [Medusa](https://github.com/medusajs/medusa).
 
 ## Running it
 
+You need Node 24, the version in `.nvmrc`, and Yarn 3.2.1, the version pinned in `package.json`.
+
 ```sh
 yarn install
 yarn build
 yarn test
+```
+
+The module integration tests need a running Postgres:
+
+```sh
+yarn test:integration:modules
 ```
 
 ## Reviews
