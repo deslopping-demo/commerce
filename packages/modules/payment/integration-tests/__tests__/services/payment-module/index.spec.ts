@@ -1259,6 +1259,81 @@ moduleIntegrationTestRunner<IPaymentModuleService>({
             )
           })
 
+          it("should refund what is left when no amount is passed after a partial refund", async () => {
+            await service.capturePayment({
+              amount: 100,
+              payment_id: "pay-id-2",
+            })
+
+            await service.refundPayment({
+              amount: 30,
+              payment_id: "pay-id-2",
+            })
+
+            const refundedPayment = await service.refundPayment({
+              payment_id: "pay-id-2",
+            })
+
+            expect(refundedPayment).toEqual(
+              expect.objectContaining({
+                id: "pay-id-2",
+                amount: 100,
+                refunds: [
+                  expect.objectContaining({
+                    amount: 30,
+                  }),
+                  expect.objectContaining({
+                    amount: 70,
+                  }),
+                ],
+              })
+            )
+          })
+
+          it("should refund only the captured part when no amount is passed", async () => {
+            await service.capturePayment({
+              amount: 60,
+              payment_id: "pay-id-2",
+            })
+
+            const refundedPayment = await service.refundPayment({
+              payment_id: "pay-id-2",
+            })
+
+            expect(refundedPayment).toEqual(
+              expect.objectContaining({
+                id: "pay-id-2",
+                amount: 100,
+                refunds: [
+                  expect.objectContaining({
+                    amount: 60,
+                  }),
+                ],
+              })
+            )
+          })
+
+          it("should throw if no amount is passed and nothing is left to refund", async () => {
+            await service.capturePayment({
+              amount: 100,
+              payment_id: "pay-id-2",
+            })
+
+            await service.refundPayment({
+              payment_id: "pay-id-2",
+            })
+
+            const error = await service
+              .refundPayment({
+                payment_id: "pay-id-2",
+              })
+              .catch((e) => e)
+
+            expect(error.message).toEqual(
+              "There is nothing left to refund on the payment."
+            )
+          })
+
           it("should throw if total refunded amount is greater than captured amount", async () => {
             await service.capturePayment({
               amount: 100,

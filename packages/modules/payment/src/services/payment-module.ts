@@ -965,11 +965,9 @@ export default class PaymentModuleService
     data: CreateRefundDTO,
     @MedusaContext() sharedContext: Context = {}
   ): Promise<InferEntityType<typeof Refund>> {
-    // If no amount is passed, we assume the full payment amount needs to be
-    // refunded. An explicit amount, however, must be strictly positive.
-    if (data.amount == null) {
-      data.amount = payment.amount as BigNumberInput
-    } else if (MathBN.lte(data.amount, 0)) {
+    // An explicit amount must be strictly positive. With no amount, the refund
+    // is whatever is still refundable, worked out below under the row lock.
+    if (data.amount != null && MathBN.lte(data.amount, 0)) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
         `Refund amount must be greater than 0.`
@@ -1015,12 +1013,30 @@ export default class PaymentModuleService
       return MathBN.add(refundedAmount, next.raw_amount as BigNumberInput)
     }, MathBN.convert(0))
 
-    const totalRefundedAmount = MathBN.add(refundedAmount, data.amount)
-
     const upperCurCode = payment.currency_code?.toUpperCase() as string
     const currencyEpsilon = getEpsilonFromDecimalPrecision(
       defaultCurrencies[upperCurCode]?.decimal_digits
     )
+
+    // With no amount, refund what is left: captured minus already refunded.
+    // The default used to be the payment's full amount, which asked for too
+    // much as soon as a payment was partly captured or partly refunded, and
+    // the guard below then refused it. The totals are read under the lock, so
+    // a refund that committed a moment ago is already counted here.
+    if (data.amount == null) {
+      const refundableAmount = MathBN.sub(capturedAmount, refundedAmount)
+
+      if (MathBN.lte(refundableAmount, currencyEpsilon)) {
+        throw new MedusaError(
+          MedusaError.Types.INVALID_DATA,
+          `There is nothing left to refund on the payment.`
+        )
+      }
+
+      data.amount = refundableAmount
+    }
+
+    const totalRefundedAmount = MathBN.add(refundedAmount, data.amount)
 
     if (
       MathBN.lt(
