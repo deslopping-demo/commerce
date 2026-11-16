@@ -37,5 +37,26 @@ describe("MFA utilities", () => {
         verifyRecoveryCodeHash(hash, "abcde-54321")
       ).resolves.toBe(false)
     })
+
+    it("accepts a recovery code typed back with spaces or without dashes", async () => {
+      const code = generateRecoveryCode()
+      const hash = await hashRecoveryCode(code)
+
+      await expect(
+        verifyRecoveryCodeHash(hash, code.replace(/-/g, " "))
+      ).resolves.toBe(true)
+      await expect(
+        verifyRecoveryCodeHash(hash, code.replace(/-/g, "").toUpperCase())
+      ).resolves.toBe(true)
+    })
+
+    it("still refuses a recovery code with a digit missing", async () => {
+      const code = generateRecoveryCode()
+      const hash = await hashRecoveryCode(code)
+
+      await expect(
+        verifyRecoveryCodeHash(hash, code.slice(0, -1))
+      ).resolves.toBe(false)
+    })
   })
 })

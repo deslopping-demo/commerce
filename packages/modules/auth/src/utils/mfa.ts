@@ -77,6 +77,12 @@ function deriveKey(encryptionKey: string): Buffer {
   return crypto.createHash("sha256").update(encryptionKey).digest()
 }
 
+// A recovery code is 32 hex digits, shown in groups of four. People type it
+// back with spaces, without the dashes or in capitals, and all of those are
+// the same code. Everything that is not a hex digit is dropped and the groups
+// are rebuilt, so what is hashed here is what was hashed when it was issued.
 function normalizeRecoveryCode(code: string): string {
-  return code.trim().toLowerCase()
+  const digits = code.toLowerCase().replace(/[^0-9a-f]/g, "")
+
+  return digits.match(/.{1,4}/g)?.join("-") ?? ""
 }
